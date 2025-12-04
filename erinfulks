@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        .viz-container {
+            position: relative;
+            width: 100%;
+            height: 950px;
+            background-color: #ffffff; /* Light Mode */
+            color: #333;
+            font-family: sans-serif;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #ccc;
+        }
+        #controls {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px; border-radius: 8px;
+            border: 1px solid #ddd; z-index: 10;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 260px;
+        }
+        #inspector {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px; border-radius: 8px;
+            border: 1px solid #ddd; z-index: 10;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 240px;
+            display: none; /* Hidden by default */
+            max-height: 800px;
+            display: flex; flex-direction: column;
+        }
+        .control-group { margin-bottom: 15px; }
+        label { font-size: 12px; font-weight: bold; color: #555; display: block; margin-bottom: 4px; }
+        input[type="number"] { padding: 6px; width: 60px; font-size: 14px; background: #fff; color: #333; border: 1px solid #ccc; border-radius: 4px; }
+        
+        .btn { 
+            display: block; width: 100%; margin-top: 5px; padding: 10px; 
+            font-size: 13px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; 
+            text-align: center; color: white; transition: background 0.2s;
+        }
+        .btn-primary { background: #007bff; color: #fff; }
+        .btn-primary:hover { background: #0056b3; }
+        
+        .btn-action { background: #ff0055; color: #fff;}
+        .btn-action:hover { background: #cc0044; }
+        
+        .btn-reset { background: #eee; color: #333; margin-top: 10px; font-size: 11px;}
+        .btn-reset:hover { background: #ddd; }
+
+        #tooltip {
+            position: absolute; pointer-events: none;
+            background: rgba(20, 20, 20, 0.95);
+            color: white; padding: 10px 12px;
+            border-radius: 6px; font-size: 12px;
+            display: none; z-index: 20; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 1px solid #444;
+            min-width: 140px;
+        }
+
+        #status { margin-top: 10px; color: #666; font-size: 11px; font-family: monospace; border-top: 1px solid #eee; padding-top: 5px;}
+        
+        canvas { display: block; width: 100%; height: 100%; cursor: move; }
+        
+        /* Inspector Styles */
+        .inspector-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px; border-bottom: 1px solid #eee; padding-bottom: 3px; }
+        .inspector-label { color: #666; }
+        .inspector-val { font-weight: bold; color: #000; font-family: monospace; }
+        .inspector-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #333; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+        
+        #insp-paths-container { margin-top: 10px; border-top: 1px solid #eee; padding-top: 5px; flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
+        #insp-paths-label { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 5px; }
+        #insp-paths-list { 
+            font-family: monospace; font-size: 11px; color: #333; 
+            background: #f9f9f9; padding: 5px; border-radius: 4px; border: 1px solid #eee;
+            overflow-y: auto; max-height: 300px;
+        }
+
+        /* Legend Styles */
+        .legend { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
+        .legend-title { font-size: 12px; font-weight: bold; color: #333; margin-bottom: 5px; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 4px; font-size: 11px; color: #666; }
+        .dot { border-radius: 50%; display: inline-block; margin-right: 8px; background: #999; }
+        .dot-sm { width: 4px; height: 4px; background: #bbb; }
+        .dot-md { width: 8px; height: 8px; background: #666; }
+        .dot-lg { width: 14px; height: 14px; background: #333; }
+        .line-legend { height: 2px; width: 20px; margin-right: 8px; display: inline-block; }
+
+    </style>
+</head>
+<body>
+
+<div class="viz-container">
+    <!-- Node Inspector Panel -->
+    <div id="inspector" style="display:none;">
+        <div class="inspector-title">Node Inspector</div>
+        <div class="inspector-row"><span class="inspector-label">Number:</span> <span class="inspector-val" id="insp-id">-</span></div>
+        <div class="inspector-row"><span class="inspector-label">Traffic (Visits):</span> <span class="inspector-val" id="insp-visits">-</span></div>
+        <div class="inspector-row"><span class="inspector-label">Shell:</span> <span class="inspector-val" id="insp-shell">-</span></div>
+        <div class="inspector-row"><span class="inspector-label">Angle:</span> <span class="inspector-val" id="insp-angle">-</span></div>
+        
+        <div id="insp-paths-container">
+            <div id="insp-paths-label">Paths Passing Through:</div>
+            <div id="insp-paths-list">-</div>
+        </div>
+    </div>
+
+    <!-- Controls Panel -->
+    <div id="controls">
+        <h3 style="margin: 0 0 15px 0; border-bottom: 1px solid #eee; padding-bottom: 10px; color: #333;">Collatz Explorer</h3>
+        
+        <div class="control-group">
+            <label>Batch Range (Traffic Map)</label>
+            <div style="display: flex; gap: 5px; align-items: center;">
+                <input type="number" id="rangeStart" value="1" min="1" style="width: 50px;">
+                <span style="font-size: 12px;">to</span>
+                <input type="number" id="rangeEnd" value="100" min="1" style="width: 50px;">
+            </div>
+            <button class="btn btn-action" onclick="runRange()">Generate Traffic</button>
+        </div>
+
+        <div class="control-group">
+            <label>Single Path Inspector</label>
+            <div style="display: flex; gap: 5px;">
+                <input type="number" id="singleInput" value="27" min="1">
+                <button class="btn btn-primary" style="margin:0; width: auto; flex-grow: 1;" onclick="runSingle()">Trace</button>
+            </div>
+        </div>
+        
+        <button class="btn btn-reset" onclick="resetView()">Reset Camera</button>
+        <button class="btn btn-reset" onclick="clearData()">Clear All</button>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-title">Key</div>
+            <div class="legend-item"><span class="dot dot-sm"></span> Single Path (Rare)</div>
+            <div class="legend-item"><span class="dot dot-md"></span> Intersection</div>
+            <div class="legend-item"><span class="dot dot-lg"></span> Major Artery (Hub)</div>
+            <div class="legend-item" style="margin-top:5px;"><span class="line-legend" style="background:rgba(255,165,0,0.8)"></span> High Traffic Path</div>
+            <div class="legend-item"><span class="line-legend" style="background:rgba(0,120,255,0.4)"></span> Low Traffic Path</div>
+        </div>
+
+        <div id="status">Ready. Click Node to Inspect.</div>
+    </div>
+    
+    <!-- Enhanced Tooltip -->
+    <div id="tooltip">Node: 0</div>
+    
+    <canvas id="interactiveCanvas"></canvas>
+</div>
+
+<script>
+    (function() {
+        const canvas = document.getElementById('interactiveCanvas');
+        const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('tooltip');
+        const inspector = document.getElementById('inspector');
+        
+        // Constants
+        const TOTAL_WEDGE_RAD = Math.PI / 2;
+        
+        // Data State
+        let edges = new Map(); // Key: "u-v", Value: count
+        let nodes = new Map(); // Key: id, Value: {id, x, y, r, visits, seeds: []}
+        
+        // Camera State
+        let camera = { x: 50, y: 0, scale: 1.0 };
+        let isDragging = false;
+        let lastMouse = { x: 0, y: 0 };
+        
+        // Selection State
+        let selectedNodeId = null;
+
+        function init() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            
+            // Initial Camera Position (Bottom Left focus)
+            camera.x = 50;
+            camera.y = canvas.height - 50;
+            camera.scale = 1.0;
+
+            // Event Listeners
+            canvas.addEventListener('mousedown', onMouseDown);
+            canvas.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('mouseup', onMouseUp);
+            canvas.addEventListener('click', onClick); 
+            canvas.addEventListener('wheel', onWheel);
+            
+            draw();
+        }
+
+        // --- MATH: STATELESS LAYOUT ---
+        function getCoordinates(n) {
+            let shellIndex = Math.floor(Math.log2(n + 1));
+            let shellStart = Math.pow(2, shellIndex) - 1;
+            let indexInShell = n - shellStart;
+            
+            let denominator = Math.pow(2, shellIndex + 1);
+            let numerator = (2 * indexInShell) + 1;
+            let fraction = numerator / denominator;
+            let angleRad = fraction * TOTAL_WEDGE_RAD;
+
+            let radiusStep = 40; 
+            let r = (shellIndex + 1) * radiusStep;
+
+            let px = Math.cos(angleRad) * r;
+            let py = -Math.sin(angleRad) * r; 
+
+            return { x: px, y: py, r: r, shell: shellIndex, angleDeg: (angleRad * 180 / Math.PI) };
+        }
+
+        // --- TRANSFORM HELPERS ---
+        function worldToScreen(wx, wy) {
+            return {
+                x: camera.x + (wx * camera.scale),
+                y: camera.y + (wy * camera.scale)
+            };
+        }
+
+        function screenToWorld(sx, sy) {
+            return {
+                x: (sx - camera.x) / camera.scale,
+                y: (sy - camera.y) / camera.scale
+            };
+        }
+
+        // --- DRAWING ---
+        function draw() {
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawGrid();
+
+            let sortedEdges = Array.from(edges.values()).sort((a,b) => a.count - b.count);
+            let maxVisits = 1;
+            nodes.forEach(n => { if(n.visits > maxVisits) maxVisits = n.visits; });
+
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            sortedEdges.forEach(edge => {
+                let start = getCoordinates(edge.u);
+                let end = getCoordinates(edge.v);
+                let s = worldToScreen(start.x, start.y);
+                let e = worldToScreen(end.x, end.y);
+
+                if (s.x < -100 || s.x > canvas.width + 100 || s.y < -100 || s.y > canvas.height + 100) return;
+
+                let intensity = edge.count / maxVisits;
+                
+                if (edge.count === 1) {
+                    ctx.strokeStyle = "rgba(0, 120, 255, 0.4)";
+                    ctx.lineWidth = 1 * camera.scale;
+                } else {
+                    let r = 255;
+                    let g = Math.floor(165 * (1 - intensity)); 
+                    let b = 0;
+                    let alpha = 0.5 + intensity * 0.5;
+                    ctx.strokeStyle = `rgba(${r},${g},${b}, ${alpha})`;
+                    ctx.lineWidth = (1.5 + intensity * 4) * camera.scale;
+                }
+                
+                if (ctx.lineWidth > 10) ctx.lineWidth = 10;
+                if (ctx.lineWidth < 0.5) ctx.lineWidth = 0.5;
+
+                ctx.beginPath();
+                ctx.moveTo(s.x, s.y);
+                ctx.lineTo(e.x, e.y);
+                ctx.stroke();
+            });
+
+            // Draw Nodes
+            nodes.forEach(node => {
+                let pos = getCoordinates(node.id);
+                let sc = worldToScreen(pos.x, pos.y);
+                
+                if (sc.x < -20 || sc.x > canvas.width+20 || sc.y < -20 || sc.y > canvas.height+20) return;
+
+                // Logarithmic Size Scaling for Nodes based on traffic
+                let size = 2 * camera.scale;
+                if (node.visits > 1) size = (2 + Math.log2(node.visits)) * camera.scale;
+                if (size < 3) size = 3;
+                if (size > 20) size = 20; // Max size cap
+
+                // Highlight Selected Node
+                if (node.id === selectedNodeId) {
+                    ctx.beginPath();
+                    ctx.arc(sc.x, sc.y, size + 8, 0, Math.PI*2);
+                    ctx.fillStyle = "rgba(255, 215, 0, 0.6)"; 
+                    ctx.fill();
+                    ctx.strokeStyle = "#333";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                ctx.beginPath();
+                ctx.arc(sc.x, sc.y, size, 0, Math.PI*2);
+                
+                // Color based on activity
+                if (node.visits > 1) {
+                    ctx.fillStyle = "#333";
+                } else {
+                    ctx.fillStyle = "#bbb";
+                }
+                ctx.fill();
+            });
+        }
+
+        function drawGrid() {
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = "#e5e5e5"; 
+            for(let i=0; i<=8; i++) {
+                let ang = (i * 11.25) * (Math.PI/180);
+                let dx = Math.cos(ang) * 5000;
+                let dy = -Math.sin(ang) * 5000;
+                
+                let s = worldToScreen(0,0);
+                let e = worldToScreen(dx, dy);
+                
+                ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke();
+            }
+        }
+
+        // --- INTERACTION ---
+        function onMouseDown(e) {
+            isDragging = true;
+            lastMouse = { x: e.offsetX, y: e.offsetY };
+            canvas.style.cursor = "grabbing";
+        }
+
+        function onMouseMove(e) {
+            if (isDragging) {
+                let dx = e.offsetX - lastMouse.x;
+                let dy = e.offsetY - lastMouse.y;
+                camera.x += dx;
+                camera.y += dy;
+                lastMouse = { x: e.offsetX, y: e.offsetY };
+                requestAnimationFrame(draw);
+                return; 
+            }
+
+            let closest = hitTest(e.offsetX, e.offsetY);
+
+            if (closest) {
+                // Calculate Connections
+                let val = closest.id;
+                let incoming = [];
+                let outgoing = null;
+
+                // Incoming 1: Even parent (Always val * 2)
+                incoming.push(val * 2);
+                // Incoming 2: Odd parent (Only if (val-1)/3 is an odd integer)
+                if ((val - 1) % 3 === 0) {
+                    let oddParent = (val - 1) / 3;
+                    if (oddParent % 2 !== 0 && oddParent !== 1) { 
+                        incoming.push(oddParent);
+                    }
+                    if (val === 4) incoming.push(1); // The loop
+                }
+                incoming.sort((a,b)=>a-b);
+
+                // Outgoing
+                if (val % 2 === 0) outgoing = val / 2;
+                else outgoing = 3 * val + 1;
+
+                tooltip.style.display = "block";
+                tooltip.style.left = (e.clientX + 15) + "px";
+                tooltip.style.top = (e.clientY + 15) + "px";
+                
+                tooltip.innerHTML = `
+                    <div style="font-weight:bold; font-size:14px; border-bottom:1px solid #555; margin-bottom:4px; padding-bottom:2px;">Node ${val}</div>
+                    <div style="margin-top:2px; font-size:11px;">
+                        <span style="color:#aaa;">Incoming:</span> 
+                        <span style="color:#4db8ff; font-weight:bold;">${incoming.join(", ")}</span>
+                    </div>
+                    <div style="margin-top:2px; font-size:11px;">
+                        <span style="color:#aaa;">Outgoing:</span> 
+                        <span style="color:#ffcc00; font-weight:bold;">${outgoing}</span>
+                    </div>
+                `;
+                
+                canvas.style.cursor = "pointer";
+            } else {
+                tooltip.style.display = "none";
+                canvas.style.cursor = "move";
+            }
+        }
+
+        function onMouseUp() {
+            isDragging = false;
+            canvas.style.cursor = "move";
+        }
+
+        function onClick(e) {
+            if (isDragging) return; 
+            let closest = hitTest(e.offsetX, e.offsetY);
+            
+            if (closest) {
+                selectedNodeId = closest.id;
+                
+                // Update Inspector
+                inspector.style.display = "flex";
+                let coords = getCoordinates(closest.id);
+                document.getElementById('insp-id').innerText = closest.id;
+                document.getElementById('insp-visits').innerText = closest.visits;
+                document.getElementById('insp-shell').innerText = coords.shell;
+                document.getElementById('insp-angle').innerText = coords.angleDeg.toFixed(3) + "°";
+                
+                // Update Paths List
+                let listDiv = document.getElementById('insp-paths-list');
+                if (closest.seeds && closest.seeds.length > 0) {
+                    // Sort numerically
+                    let uniqueSeeds = [...new Set(closest.seeds)].sort((a,b)=>a-b);
+                    listDiv.innerHTML = uniqueSeeds.join(", ");
+                } else {
+                    listDiv.innerHTML = "None recorded";
+                }
+
+                draw(); 
+            } else {
+                selectedNodeId = null;
+                inspector.style.display = "none";
+                draw();
+            }
+        }
+        
+        function hitTest(mx, my) {
+            let mPos = screenToWorld(mx, my);
+            let closest = null;
+            let minDist = 15 / camera.scale; 
+
+            nodes.forEach(node => {
+                let pos = getCoordinates(node.id);
+                let dx = pos.x - mPos.x;
+                let dy = pos.y - mPos.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = node;
+                }
+            });
+            return closest;
+        }
+
+        function onWheel(e) {
+            e.preventDefault();
+            let zoomIntensity = 0.1;
+            let wheel = e.deltaY < 0 ? 1 : -1;
+            let zoom = Math.exp(wheel * zoomIntensity);
+            
+            let mouseX = e.offsetX;
+            let mouseY = e.offsetY;
+            let worldBefore = screenToWorld(mouseX, mouseY);
+            
+            camera.scale *= zoom;
+            if (camera.scale < 0.1) camera.scale = 0.1;
+            if (camera.scale > 20) camera.scale = 20;
+
+            let worldAfter = screenToWorld(mouseX, mouseY);
+            camera.x += (worldAfter.x - worldBefore.x) * camera.scale;
+            camera.y += (worldAfter.y - worldBefore.y) * camera.scale;
+
+            requestAnimationFrame(draw);
+        }
+
+        window.resetView = function() {
+            camera = { x: 50, y: canvas.height - 50, scale: 1.0 };
+            selectedNodeId = null;
+            inspector.style.display = "none";
+            draw();
+        }
+
+        // --- DATA LOGIC ---
+        function addPath(seed) {
+            let curr = seed;
+            let path = [curr];
+            let safety = 0;
+            while(curr !== 1 && safety < 8000) {
+                if (curr % 2 === 0) curr /= 2;
+                else curr = 3*curr + 1;
+                path.push(curr);
+                safety++;
+            }
+
+            for (let i = 0; i < path.length; i++) {
+                let u = path[i];
+                if (!nodes.has(u)) nodes.set(u, { id: u, visits: 0, seeds: [] });
+                
+                let n = nodes.get(u);
+                n.visits++;
+                // Store the seed that passed through here
+                n.seeds.push(seed);
+
+                if (i < path.length - 1) {
+                    let v = path[i+1];
+                    let key = `${u}-${v}`;
+                    if (!edges.has(key)) edges.set(key, { u: u, v: v, count: 0 });
+                    edges.get(key).count++;
+                }
+            }
+        }
+
+        window.runRange = function() {
+            let start = parseInt(document.getElementById('rangeStart').value);
+            let end = parseInt(document.getElementById('rangeEnd').value);
+            if (end - start > 1000) {
+                if(!confirm("Large range (>1000) may be slow to track data. Continue?")) return;
+            }
+
+            for (let i = start; i <= end; i++) {
+                addPath(i);
+            }
+            updateStatus();
+            draw();
+        }
+
+        window.runSingle = function() {
+            let seed = parseInt(document.getElementById('singleInput').value);
+            addPath(seed);
+            
+            // Auto Select
+            selectedNodeId = seed;
+            inspector.style.display = "flex";
+            let coords = getCoordinates(seed);
+            let n = nodes.get(seed);
+            document.getElementById('insp-id').innerText = seed;
+            document.getElementById('insp-visits').innerText = n ? n.visits : 1;
+            document.getElementById('insp-shell').innerText = coords.shell;
+            document.getElementById('insp-angle').innerText = coords.angleDeg.toFixed(3) + "°";
+            
+            // Populate list
+            let listDiv = document.getElementById('insp-paths-list');
+            if (n && n.seeds.length > 0) {
+                 let uniqueSeeds = [...new Set(n.seeds)].sort((a,b)=>a-b);
+                 listDiv.innerHTML = uniqueSeeds.join(", ");
+            } else {
+                 listDiv.innerHTML = seed;
+            }
+
+            updateStatus();
+            draw();
+        }
+
+        window.clearData = function() {
+            edges.clear();
+            nodes.clear();
+            selectedNodeId = null;
+            inspector.style.display = "none";
+            updateStatus();
+            draw();
+        }
+
+        function updateStatus() {
+            let maxV = 0;
+            nodes.forEach(n => { if(n.visits > maxV) maxV = n.visits; });
+            document.getElementById('status').innerText = `Nodes: ${nodes.size} | Max Traffic: ${maxV}`;
+        }
+
+        setTimeout(init, 100);
+        window.addEventListener('resize', () => {
+             const rect = canvas.parentElement.getBoundingClientRect();
+             canvas.width = rect.width;
+             canvas.height = rect.height;
+             draw();
+        });
+    })();
+</script>
+</body>
+</html>
