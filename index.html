@@ -89,6 +89,12 @@
         .dot-lg { width: 14px; height: 14px; background: #333; }
         .line-legend { height: 2px; width: 20px; margin-right: 8px; display: inline-block; }
 
+        /* Instructions Style */
+        .instructions { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; font-size: 12px; color: #333; }
+        .instructions h4 { font-size: 13px; margin: 0 0 5px 0; color: #007bff; }
+        .instructions p { margin: 0 0 4px 0; }
+        .instructions strong { color: #000; }
+
     </style>
 </head>
 <body>
@@ -143,6 +149,15 @@
             <div class="legend-item"><span class="line-legend" style="background:rgba(0,120,255,0.4)"></span> Low Traffic Path</div>
         </div>
 
+        <!-- Instructions -->
+        <div class="instructions">
+            <h4>Interaction Instructions</h4>
+            <p><strong>Zoom:</strong> Scroll Wheel (or pinch).</p>
+            <p><strong>Pan:</strong> Click and drag the map.</p>
+            <p><strong>Hover:</strong> See the number, incoming paths, and outgoing path flow.</p>
+            <p><strong>Click Node:</strong> Opens the detailed Inspector panel on the left (showing Shell/Angle/Path history).</p>
+        </div>
+
         <div id="status">Ready. Click Node to Inspect.</div>
     </div>
     
@@ -175,21 +190,30 @@
         let selectedNodeId = null;
 
         function init() {
+            // Check for valid dimensions or wait for the DOM to settle
             const rect = canvas.parentElement.getBoundingClientRect();
-            canvas.width = rect.width;
-            canvas.height = rect.height;
-            
-            // Initial Camera Position (Bottom Left focus)
+            const width = rect.width || 800;
+            const height = rect.height || 950;
+
+            // Set canvas size
+            canvas.width = width;
+            canvas.height = height;
+
+            // Initial Camera Position: Origin (0,0 world) at screen point (50, height-50)
             camera.x = 50;
-            camera.y = canvas.height - 50;
+            camera.y = height - 50;
             camera.scale = 1.0;
 
-            // Event Listeners
-            canvas.addEventListener('mousedown', onMouseDown);
-            canvas.addEventListener('mousemove', onMouseMove);
-            canvas.addEventListener('mouseup', onMouseUp);
-            canvas.addEventListener('click', onClick); 
-            canvas.addEventListener('wheel', onWheel);
+            // Event Listeners (ensure only attached once)
+            if (!window.listenersAttached) {
+                canvas.addEventListener('mousedown', onMouseDown);
+                canvas.addEventListener('mousemove', onMouseMove);
+                canvas.addEventListener('mouseup', onMouseUp);
+                canvas.addEventListener('click', onClick); 
+                canvas.addEventListener('wheel', onWheel);
+                window.addEventListener('resize', init);
+                window.listenersAttached = true;
+            }
             
             draw();
         }
@@ -469,9 +493,7 @@
         }
 
         window.resetView = function() {
-            camera = { x: 50, y: canvas.height - 50, scale: 1.0 };
-            selectedNodeId = null;
-            inspector.style.display = "none";
+            init(); // Re-initialize size and camera position
             draw();
         }
 
@@ -562,12 +584,6 @@
         }
 
         setTimeout(init, 100);
-        window.addEventListener('resize', () => {
-             const rect = canvas.parentElement.getBoundingClientRect();
-             canvas.width = rect.width;
-             canvas.height = rect.height;
-             draw();
-        });
     })();
 </script>
 </body>
