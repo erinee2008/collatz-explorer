@@ -123,15 +123,15 @@
             <div style="display: flex; gap: 5px; align-items: center;">
                 <input type="number" id="rangeStart" value="1" min="1" style="width: 50px;">
                 <span style="font-size: 12px;">to</span>
-                <input type="number" id="rangeEnd" value="100" min="1" style="width: 50px;">
+                <input type="number" id="rangeEnd" value="10000" min="1" style="width: 50px;">
             </div>
             <button class="btn btn-action" onclick="runRange()">Generate Traffic</button>
         </div>
 
         <div class="control-group">
-            <label>Single Path Inspector</label>
+            <label>Single Path Inspector (Max 1 Billion)</label>
             <div style="display: flex; gap: 5px;">
-                <input type="number" id="singleInput" value="27" min="1">
+                <input type="number" id="singleInput" value="9663" min="1">
                 <button class="btn btn-primary" style="margin:0; width: auto; flex-grow: 1;" onclick="runSingle()">Trace</button>
             </div>
         </div>
@@ -176,7 +176,8 @@
         
         // Constants
         const TOTAL_WEDGE_RAD = Math.PI / 2;
-        
+        const MAX_SINGLE_INPUT = 1000000000; // 1 Billion
+
         // Data State
         let edges = new Map(); // Key: "u-v", Value: count
         let nodes = new Map(); // Key: id, Value: {id, x, y, r, visits, seeds: []}
@@ -502,7 +503,8 @@
             let curr = seed;
             let path = [curr];
             let safety = 0;
-            while(curr !== 1 && safety < 8000) {
+            // Increased safety limit for large inputs
+            while(curr !== 1 && safety < 100000) { 
                 if (curr % 2 === 0) curr /= 2;
                 else curr = 3*curr + 1;
                 path.push(curr);
@@ -530,8 +532,9 @@
         window.runRange = function() {
             let start = parseInt(document.getElementById('rangeStart').value);
             let end = parseInt(document.getElementById('rangeEnd').value);
-            if (end - start > 1000) {
-                if(!confirm("Large range (>1000) may be slow to track data. Continue?")) return;
+            // Increased the batch check limit
+            if (end - start > 10000) {
+                if(!confirm("Very large range (>10000) may be slow to track data. Continue?")) return;
             }
 
             for (let i = start; i <= end; i++) {
@@ -543,6 +546,10 @@
 
         window.runSingle = function() {
             let seed = parseInt(document.getElementById('singleInput').value);
+            if (seed > MAX_SINGLE_INPUT) {
+                 alert(`Input is too large. Please keep the single number below ${MAX_SINGLE_INPUT.toLocaleString()}.`);
+                 return;
+            }
             addPath(seed);
             
             // Auto Select
