@@ -38,7 +38,7 @@
         
         .btn { 
             display: block; width: 100%; margin-top: 5px; padding: 10px; 
-            font-size: 13px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; 
+            font-size: 13px; cursor: pointer; border: none; border-radius: 4td; font-weight: bold; 
             text-align: center; color: white; transition: background 0.2s;
         }
         .btn-primary { background: #007bff; color: #fff; }
@@ -78,6 +78,14 @@
             background: #f9f9f9; padding: 5px; border-radius: 4px; border: 1px solid #eee;
             overflow-y: auto; max-height: 300px;
         }
+        .family-label { font-size: 14px; font-weight: bold; margin-top: 8px; padding: 4px 0; border-top: 1px solid #eee;}
+        .outcome-label { font-size: 13px; font-weight: bold; margin-top: 5px; padding: 4px 0; border-bottom: 1px solid #eee;}
+
+        /* External Links */
+        .external-links { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
+        .external-links a { font-size: 12px; color: #007bff; text-decoration: none; display: block; margin-bottom: 5px; }
+        .external-links a:hover { text-decoration: underline; }
+
 
         /* Legend Styles */
         .legend { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
@@ -108,9 +116,21 @@
         <div class="inspector-row"><span class="inspector-label">Shell:</span> <span class="inspector-val" id="insp-shell">-</span></div>
         <div class="inspector-row"><span class="inspector-label">Angle:</span> <span class="inspector-val" id="insp-angle">-</span></div>
         
+        <!-- Geometric Classification & Outcome -->
+        <div class="family-label" id="insp-family-label"></div>
+        <div class="outcome-label">Geometric Outcome: <span id="insp-outcome-val">N/A</span></div>
+        
+        <div class="inspector-row"><span class="inspector-label">Peak (3n+1):</span> <span class="inspector-val" id="insp-peak">-</span></div>
+        <div class="inspector-row"><span class="inspector-label">Next Odd Number:</span> <span class="inspector-val" id="insp-next-odd">-</span></div>
+
         <div id="insp-paths-container">
             <div id="insp-paths-label">Paths Passing Through:</div>
             <div id="insp-paths-list">-</div>
+        </div>
+        
+        <!-- Link to the paper -->
+        <div class="external-links">
+            <a href="https://doi.org/10.5281/zenodo.17822229" target="_blank">View Formal Paper (Zenodo DOI)</a>
         </div>
     </div>
 
@@ -158,7 +178,7 @@
             <p><strong>Click Node:</strong> Opens the detailed Inspector panel on the left (showing Shell/Angle/Path history).</p>
         </div>
 
-        <div id="status">Ready. Click Node to Inspect.</div>
+        <div id="status">Paper DOI: 10.5281/zenodo.17822229</div>
     </div>
     
     <!-- Enhanced Tooltip -->
@@ -254,6 +274,34 @@
             };
         }
 
+        // --- SYRACUSE LOGIC (For Inspection/Classification) ---
+        function getNextOdd(n) {
+             if (n % 2 === 0 || n === 1) return { peak: n, nextOdd: n, family: 'Even/Attractor', outcome: 'Contraction (Drain)' }; 
+             
+             let peak = 3 * n + 1;
+             let next = peak;
+             let divisions = 0;
+             while (next % 2 === 0) {
+                 next /= 2;
+                 divisions++;
+             }
+             
+             let family = 'Unknown';
+             let outcome = 'Unknown';
+
+             if (divisions >= 2) {
+                 family = 'Family A (Short Hopper)'; // Net factor ~ 0.75
+                 outcome = 'Contraction (Shrinkage)';
+             } else if (divisions === 1) {
+                 family = 'Family B (High Flyer)'; // Net factor ~ 1.5
+                 outcome = 'Expansion (Growth)';
+             } else {
+                 outcome = 'Error/Loop Check'; // Safety net
+             }
+             
+             return { peak: peak, nextOdd: next, family: family, outcome: outcome };
+        }
+        
         // --- DRAWING ---
         function draw() {
             ctx.fillStyle = "#ffffff";
@@ -436,6 +484,33 @@
                 document.getElementById('insp-shell').innerText = coords.shell;
                 document.getElementById('insp-angle').innerText = coords.angleDeg.toFixed(3) + "°";
                 
+                // New Geometric Family Data
+                let val = closest.id;
+                let familyLabelDiv = document.getElementById('insp-family-label');
+                let outcomeDiv = document.getElementById('insp-outcome-val');
+
+                if (val % 2 !== 0 && val !== 1) {
+                    let syracuse = getNextOdd(val);
+                    familyLabelDiv.style.color = syracuse.family.includes('A') ? '#007bff' : '#ff0055';
+                    familyLabelDiv.innerText = `Family: ${syracuse.family}`;
+                    
+                    outcomeDiv.innerText = syracuse.outcome;
+                    outcomeDiv.style.color = syracuse.outcome.includes('Contraction') ? '#007bff' : '#ff0055';
+                    
+                    document.getElementById('insp-peak').innerText = syracuse.peak;
+                    document.getElementById('insp-next-odd').innerText = syracuse.nextOdd;
+                } else {
+                     familyLabelDiv.innerText = 'Family: Even/Attractor';
+                     familyLabelDiv.style.color = '#333';
+                     
+                     outcomeDiv.innerText = 'Contraction (Drain)';
+                     outcomeDiv.style.color = '#007bff';
+                     
+                     document.getElementById('insp-peak').innerText = 'N/A';
+                     document.getElementById('insp-next-odd').innerText = 'N/A';
+                }
+
+
                 // Update Paths List
                 let listDiv = document.getElementById('insp-paths-list');
                 if (closest.seeds && closest.seeds.length > 0) {
@@ -562,6 +637,33 @@
             document.getElementById('insp-shell').innerText = coords.shell;
             document.getElementById('insp-angle').innerText = coords.angleDeg.toFixed(3) + "°";
             
+            // New Geometric Family Data
+            let val = seed;
+            let familyLabelDiv = document.getElementById('insp-family-label');
+            let outcomeDiv = document.getElementById('insp-outcome-val');
+
+            if (val % 2 !== 0 && val !== 1) {
+                let syracuse = getNextOdd(val);
+                familyLabelDiv.style.color = syracuse.family.includes('A') ? '#007bff' : '#ff0055';
+                familyLabelDiv.innerText = `Family: ${syracuse.family}`;
+                
+                outcomeDiv.innerText = syracuse.outcome;
+                outcomeDiv.style.color = syracuse.outcome.includes('Contraction') ? '#007bff' : '#ff0055';
+                
+                document.getElementById('insp-peak').innerText = syracuse.peak;
+                document.getElementById('insp-next-odd').innerText = syracuse.nextOdd;
+            } else {
+                 familyLabelDiv.innerText = 'Family: Even/Attractor';
+                 familyLabelDiv.style.color = '#333';
+                 
+                 outcomeDiv.innerText = 'Contraction (Drain)';
+                 outcomeDiv.style.color = '#007bff';
+                 
+                 document.getElementById('insp-peak').innerText = 'N/A';
+                 document.getElementById('insp-next-odd').innerText = 'N/A';
+            }
+
+
             // Populate list
             let listDiv = document.getElementById('insp-paths-list');
             if (n && n.seeds.length > 0) {
